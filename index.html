@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>iPlant - AI Assistant</title>
+    <link rel="icon" href="logo5.png" type="image/png">
+    <link rel="apple-touch-icon" href="logo5.png">
     <style>
         * {
             margin: 0;
@@ -648,7 +650,7 @@
                 </svg>
             </button>
         </div>
-        <div class="mobile-site-link">www.iplantjo.com</div>
+        <div class="mobile-site-link">🌐 www.iplantjo.com · 📞 +962 79 567 4643</div>
     </div>
 
     <div class="chat-mode" id="chatMode">
@@ -684,7 +686,7 @@
                 </svg>
             </button>
         </div>
-        <div class="mobile-site-link">www.iplantjo.com</div>
+        <div class="mobile-site-link">🌐 www.iplantjo.com · 📞 +962 79 567 4643</div>
     </div>
 
     <div class="footer-info">
@@ -722,37 +724,38 @@
         // Session ID for conversation continuity
         let sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-        // Client-side chat limits
-        const DAILY_MAX = 20;       // total prompts allowed per day (per browser)
-        const cooldownMs = 3000;    // 3 seconds between messages
-        let userPromptCount = 0;    // current prompt count (today)
-        let lastSentAt = 0;         // timestamp of last sent message
-
-        function todayKey() {
-            const d = new Date();
-            const y = d.getFullYear();
-            const m = String(d.getMonth()+1).padStart(2,'0');
-            const day = String(d.getDate()).padStart(2,'0');
-            return `${y}-${m}-${day}`;
-        }
+        // Client-side chat limits (20 prompts per 10 hours)
+        const DAILY_MAX = 20;              // total prompts allowed per 10 hours (per browser)
+        const PERIOD_MS = 10 * 60 * 60 * 1000; // 10 hours
+        const cooldownMs = 3000;           // 3 seconds between messages
+        let userPromptCount = 0;           // current prompt count in window
+        let lastSentAt = 0;                // timestamp of last sent message
+        let quotaWindowStart = 0;          // start timestamp of current 10-hour window
 
         function loadDailyCount() {
             try {
-                const key = todayKey();
+                const now = Date.now();
                 const stored = JSON.parse(localStorage.getItem('iplant.dailyQuota') || '{}');
-                if (stored.date !== key) {
-                    return { date: key, count: 0 };
+                let start = stored.windowStart || 0;
+                let count = stored.count | 0;
+                if (!start || (now - start) >= PERIOD_MS) {
+                    start = now;
+                    count = 0;
                 }
-                return { date: key, count: stored.count || 0 };
-            } catch { return { date: todayKey(), count: 0 }; }
+                quotaWindowStart = start;
+                return { count };
+            } catch {
+                quotaWindowStart = Date.now();
+                return { count: 0 };
+            }
         }
 
         function saveDailyCount(count) {
-            const obj = { date: todayKey(), count: count|0 };
+            const obj = { windowStart: quotaWindowStart, count: count | 0 };
             try { localStorage.setItem('iplant.dailyQuota', JSON.stringify(obj)); } catch {}
         }
 
-        // Initialize daily counter on load
+        // Initialize quota counter on load
         (function initDailyQuota(){
             const { count } = loadDailyCount();
             userPromptCount = count;
@@ -800,13 +803,13 @@
             const overLimit = userPromptCount >= DAILY_MAX;
             if (overLimit) {
                 setInputsEnabled(false);
-                if (mainInput) mainInput.placeholder = 'Prompt limit reached for this session.';
-                if (chatInput) chatInput.placeholder = 'Prompt limit reached for this session.';
-                const now = new Date();
-                const midnight = new Date(now); midnight.setHours(24,0,0,0);
-                const secs = Math.ceil((midnight - now)/1000);
-                const hrs = Math.floor(secs/3600), mins = Math.floor((secs%3600)/60);
-                showError(`Daily limit reached (${DAILY_MAX}). Try again in ${hrs}h ${mins}m.`);
+                if (mainInput) mainInput.placeholder = '10-hour limit reached.';
+                if (chatInput) chatInput.placeholder = '10-hour limit reached.';
+                const now = Date.now();
+                const remainingMs = Math.max(0, (quotaWindowStart + PERIOD_MS) - now);
+                const hrs = Math.floor(remainingMs / 3600000);
+                const mins = Math.floor((remainingMs % 3600000) / 60000);
+                showError(`Limit reached (${DAILY_MAX} per 10h). Try again in ${hrs}h ${mins}m.`);
             }
         }
 
@@ -916,8 +919,13 @@
             if (!message) return;
 
             // Rate limiting and quota checks
-            const now = Date.now();
-            if (userPromptCount >= DAILY_MAX) {
+              const now = Date.now();
+              // Refresh quota window each send attempt
+              {
+                  const { count } = loadDailyCount();
+                  userPromptCount = count;
+              }
+              if (userPromptCount >= DAILY_MAX) {
                 enforcePromptLimitUI();
                 return;
             }
@@ -934,8 +942,8 @@
             addMessage(message, true);
             // Update counters after accepting the message
             lastSentAt = now;
-            userPromptCount++;
-            saveDailyCount(userPromptCount);
+              userPromptCount++;
+              saveDailyCount(userPromptCount);
             enforcePromptLimitUI();
             chatInput.value = '';
             mainInput.value = '';
