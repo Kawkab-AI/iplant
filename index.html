@@ -543,6 +543,10 @@
             animation: fadeIn 0.3s ease;
         }
 
+        /* Mobile-only site link, hidden by default */
+        .mobile-site-link { display: none; font-size: 0.9rem; text-align: center; margin: 0.5rem 0 0.25rem; color: #aaa; }
+        body.light-mode .mobile-site-link { color: #666; }
+
         @media (max-width: 768px) {
             .welcome-title {
                 font-size: 2rem;
@@ -573,6 +577,7 @@
             .send-button { width: 32px; height: 32px; }
             .send-button svg { width: 18px; height: 18px; }
             .footer-info { font-size: 0.75rem; bottom: 0.5rem; padding: 0 1rem; }
+            .mobile-site-link { display: block; }
         }
 
         /* Prevent media overflow on any screen */
@@ -589,6 +594,7 @@
             .welcome-title { font-size: 1.6rem; }
             .logo-container img { height: 42px; }
             .footer-info { display: none; }
+            .mobile-site-link { display: block; }
             .theme-toggle { top: 0.75rem; right: 0.75rem; }
             /* iOS safe area padding to avoid UI overlap */
             .input-container { padding-bottom: max(0.25rem, env(safe-area-inset-bottom)); }
@@ -642,6 +648,7 @@
                 </svg>
             </button>
         </div>
+        <div class="mobile-site-link">www.iplantjo.com</div>
     </div>
 
     <div class="chat-mode" id="chatMode">
@@ -677,6 +684,7 @@
                 </svg>
             </button>
         </div>
+        <div class="mobile-site-link">www.iplantjo.com</div>
     </div>
 
     <div class="footer-info">
@@ -750,12 +758,16 @@
             userPromptCount = count;
         })();
 
-        // Theme Toggle Functionality
-        let isDarkMode = true;
+        // Theme Toggle Functionality (default: light mode)
+        let isDarkMode = false;
         const savedTheme = sessionStorage.getItem('theme');
-        
-        if (savedTheme === 'light') {
-            isDarkMode = false;
+
+        if (savedTheme === 'dark') {
+            isDarkMode = true;
+            document.body.classList.remove('light-mode');
+            themeIcon.textContent = '🌙';
+        } else {
+            // Default to light mode when not explicitly set to dark
             document.body.classList.add('light-mode');
             themeIcon.textContent = '☀️';
         }
@@ -766,7 +778,7 @@
             themeIcon.textContent = isDarkMode ? '🌙' : '☀️';
             themeIcon.classList.add('active');
             setTimeout(() => themeIcon.classList.remove('active'), 300);
-            
+
             sessionStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
         });
 
